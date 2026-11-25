@@ -82,8 +82,10 @@ class DetalleMantencion(ModelBase):
     repuesto = ForeignKeyField(Repuesto)
     cantidad = IntegerField()
 
-    class Meta:
-        indexes = ((("mantencion", "repuesto"), True),)
+
+DetalleMantencion.add_index(
+    DetalleMantencion.mantencion, DetalleMantencion.repuesto, unique=True
+)
 
 
 class Factura(ModelBase):

@@ -20,7 +20,6 @@ from datos.repositorio import (
     mantencion,
     detalle_mantencion,
     factura,
-    usuario,
 )
 from datos.repositorio.comun import cerrar_base_datos, iniciar_base_datos
 
@@ -37,7 +36,7 @@ ENTIDADES = {
     "detalle_mantencion": (DetalleMantencion, detalle_mantencion),
     "factura": (Factura, factura),
 }
-REPOSITORIOS = {modelo: repositorio for modelo, repositorio in ENTIDADES.values()}
+REPOSITORIOS = dict(ENTIDADES.values())
 
 
 def campos_editables(modelo):
@@ -104,28 +103,38 @@ def convertir_valor(campo, valor):
     return texto_obligatorio(valor, nombre)
 
 
+def validar_vehiculo(registro):
+    registro.patente = registro.patente.upper()
+    if len(registro.patente) != 6 or not registro.patente.isalnum():
+        raise ValueError("La patente debe tener 6 letras o números.")
+    if registro.anio < 1886:
+        raise ValueError("Ingresa un año válido.")
+
+
+def validar_tipo_vehiculo(id_vehiculo, otro_repositorio):
+    if otro_repositorio.buscar_por_vehiculo(id_vehiculo):
+        raise ValueError("El vehículo ya está registrado con otro tipo.")
+
+
 def validar_registro(entidad, registro):
-    if entidad == "vehiculo":
-        registro.patente = registro.patente.upper()
-        if len(registro.patente) != 6 or not registro.patente.isalnum():
-            raise ValueError("La patente debe tener 6 letras o números.")
-        if registro.anio < 1886:
-            raise ValueError("Ingresa un año válido.")
-    if entidad == "cliente" and ("@" not in registro.email or " " in registro.email):
-        raise ValueError("Ingresa un correo válido.")
-    if entidad == "mantencion" and registro.fecha_salida is not None:
-        if registro.fecha_salida < registro.fecha_ingreso:
-            raise ValueError("La fecha de salida debe ser posterior o igual a la de ingreso.")
-    if entidad in ("automovil", "camioneta"):
-        otro_repositorio = camioneta if entidad == "automovil" else automovil
-        if otro_repositorio.buscar_por_vehiculo(registro.vehiculo_id):
-            raise ValueError("El vehículo ya está registrado con otro tipo.")
-    if entidad == "detalle_mantencion" and registro.cantidad == 0:
-        raise ValueError("La cantidad debe ser mayor que cero.")
-    if entidad == "factura":
-        registro.total = entero_no_negativo(
-            str(registro.subtotal + registro.impuestos), "El total"
-        )
+    match entidad:
+        case "vehiculo":
+            validar_vehiculo(registro)
+        case "cliente" if "@" not in registro.email or " " in registro.email:
+            raise ValueError("Ingresa un correo válido.")
+        case "mantencion" if registro.fecha_salida is not None:
+            if registro.fecha_salida < registro.fecha_ingreso:
+                raise ValueError("La fecha de salida debe ser posterior o igual a la de ingreso.")
+        case "automovil":
+            validar_tipo_vehiculo(registro.vehiculo_id, camioneta)
+        case "camioneta":
+            validar_tipo_vehiculo(registro.vehiculo_id, automovil)
+        case "detalle_mantencion" if registro.cantidad == 0:
+            raise ValueError("La cantidad debe ser mayor que cero.")
+        case "factura":
+            registro.total = entero_no_negativo(
+                str(registro.subtotal + registro.impuestos), "El total"
+            )
 
 
 def guardar(entidad, entradas, id_registro=None):

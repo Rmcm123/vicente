@@ -1,4 +1,4 @@
-from peewee import DatabaseError, IntegrityError
+from peewee import IntegrityError
 
 from auxiliares.mensajes import DATOS_EN_CONFLICTO
 from datos.conexion import base_datos
@@ -6,11 +6,8 @@ from datos.modelos import MODELOS
 
 
 def iniciar_base_datos():
-    try:
-        base_datos.connect(reuse_if_open=True)
-        base_datos.create_tables(MODELOS)
-    except DatabaseError as error:
-        raise RuntimeError("No se pudo abrir o preparar la base de datos.") from error
+    base_datos.connect(reuse_if_open=True)
+    base_datos.create_tables(MODELOS)
 
 
 def cerrar_base_datos():

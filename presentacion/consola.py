@@ -1,4 +1,5 @@
 from maskpass import askpass
+from peewee import DatabaseError
 
 from auxiliares.mensajes import CREDENCIALES_INVALIDAS
 from auxiliares.validaciones import entero_no_negativo
@@ -71,19 +72,23 @@ def leer_id():
     return entero_no_negativo(input("ID del registro: "), "El ID")
 
 
-def leer_datos(entidad, actual=None):
+def sugerir_valor(nombre: str, registro: dict[str, object]) -> str:
+    valor = registro.get(nombre, registro.get(f"{nombre}_id"))
+    if isinstance(valor, bool):
+        valor = "s" if valor else "n"
+    return f" [{valor if valor is not None else 'vacío'}]"
+
+
+def leer_datos(
+    entidad: str, actual: dict[str, object] | None = None
+) -> dict[str, str]:
     datos = {}
     for nombre, etiqueta in taller.campos_formulario(entidad).items():
-        valor_actual = None if actual is None else actual.get(nombre, actual.get(f"{nombre}_id"))
-        if isinstance(valor_actual, bool):
-            valor_actual = "s" if valor_actual else "n"
-        sugerencia = ""
-        if actual is not None:
-            visible = valor_actual if valor_actual is not None else "vacío"
-            sugerencia = f" [{visible}]"
+        sugerencia = sugerir_valor(nombre, actual) if actual is not None else ""
         valor = input(f"{etiqueta}{sugerencia}: ").strip()
-        if actual is None or valor:
-            datos[nombre] = "" if actual is not None and valor == "-" else valor
+        if actual is not None and not valor:
+            continue
+        datos[nombre] = "" if actual is not None and valor == "-" else valor
     return datos
 
 
@@ -148,21 +153,23 @@ def menu_entidad(entidad, id_usuario_actual):
 
 
 def menu_principal(id_usuario_actual):
-    entidades = list(NOMBRES_ENTIDADES)
+    opciones = {
+        str(numero): entidad
+        for numero, entidad in enumerate(NOMBRES_ENTIDADES, start=1)
+    }
     while True:
         print("\nTaller mecánico")
-        for numero, entidad in enumerate(entidades, start=1):
+        for numero, entidad in opciones.items():
             print(f"{numero}. {NOMBRES_ENTIDADES[entidad]}")
         print("0. Salir")
-        try:
-            opcion = entero_no_negativo(input("Opción: "), "La opción")
-            if opcion == 0:
-                return
-            if opcion > len(entidades):
-                raise ValueError("Opción inválida.")
-            menu_entidad(entidades[opcion - 1], id_usuario_actual)
-        except ValueError as error:
-            print(error)
+        opcion = input("Opción: ").strip()
+        if opcion == "0":
+            return
+        entidad = opciones.get(opcion)
+        if entidad is None:
+            print("Opción inválida.")
+        else:
+            menu_entidad(entidad, id_usuario_actual)
 
 
 def ejecutar():
@@ -171,8 +178,8 @@ def ejecutar():
         id_usuario = login()
         if id_usuario is not None:
             menu_principal(id_usuario)
-    except RuntimeError as error:
-        print(error)
+    except DatabaseError:
+        print("No se pudo completar la operación con la base de datos.")
     except (KeyboardInterrupt, EOFError):
         print("\nAplicación cerrada.")
     finally:
